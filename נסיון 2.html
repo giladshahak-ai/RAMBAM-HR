@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
@@ -335,6 +335,38 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-h
   .staffing-layout{grid-template-columns:1fr;}
   .staffing-sidebar{position:static;}
 }
+
+/* ── PLANNING VIEW ── */
+.plan-grid{overflow-x:auto;}
+.plan-table{border-collapse:collapse;font-size:11px;min-width:900px;width:100%;}
+.plan-table th{padding:6px 8px;text-align:center;font-weight:600;font-size:9px;color:var(--muted);border-bottom:2px solid var(--border);white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:2;}
+.plan-table th.name-col{text-align:right;position:sticky;right:0;background:var(--surface);z-index:3;}
+.plan-table td{padding:4px 6px;border-bottom:1px solid var(--bg);text-align:center;vertical-align:middle;}
+.plan-table td.name-col{text-align:right;position:sticky;right:0;background:var(--surface);z-index:1;padding:4px 10px;min-width:130px;}
+.plan-table tr:hover td{background:var(--bg);}
+.plan-table tr:hover td.name-col{background:var(--bg);}
+.month-cell{width:36px;height:28px;border-radius:4px;margin:1px;display:inline-block;}
+.mc-present{background:#1A7A4A;opacity:.85;}
+.mc-absent{background:#BE185D;opacity:.7;}
+.mc-ending{background:#B45309;opacity:.9;}
+.mc-gone{background:#E8E5DF;}
+.mc-future{background:#E0F2FE;opacity:.7;}
+.tr-badge-sm{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:var(--blue-light);color:var(--blue);font-size:8px;font-weight:600;margin-left:3px;}
+.plan-legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 0 14px;font-size:10px;color:var(--muted);align-items:center;}
+.plan-leg{display:flex;align-items:center;gap:5px;}
+.plan-leg-dot{width:14px;height:14px;border-radius:3px;flex-shrink:0;}
+.shortage-bar{margin-bottom:16px;}
+.shortage-title{font-size:11px;font-weight:600;margin-bottom:8px;color:var(--text);}
+.shortage-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.shortage-label{font-size:10px;color:var(--muted);width:60px;text-align:right;flex-shrink:0;}
+.shortage-months{display:flex;gap:2px;}
+.shortage-month{width:32px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;cursor:default;}
+.sm-ok{background:#E8F5EE;color:#1A7A4A;}
+.sm-warn{background:#FEF3E0;color:#B45309;}
+.sm-danger{background:#FEE8E8;color:#B91C1C;}
+.sm-label{font-size:8px;color:var(--faint);text-align:center;width:32px;}
+.upgrade-chip{display:inline-flex;align-items:center;gap:3px;font-size:8px;padding:1px 5px;border-radius:5px;background:#EDE9FE;color:#5B21B6;cursor:pointer;margin-right:3px;border:1px solid transparent;}
+.upgrade-chip.active{border-color:#5B21B6;}
 </style>
 </head>
 <body>
@@ -573,6 +605,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="tl-tab active" onclick="showTLTab('torant')">פילוח הכשרות</div>
       <div class="tl-tab" onclick="showTLTab('status')">לוח סטטוס</div>
       <div class="tl-tab" onclick="showTLTab('duty')">כמות תורנויות</div>
+      <div class="tl-tab" onclick="showTLTab('plan')">📅 תכנון קדימה</div>
     </div>
     <div id="tl-content"></div>
   </div>
@@ -699,6 +732,8 @@ async function syncFromSheets(){
     }
     if(data.slots){slots=data.slots;document.getElementById('sl-spec').value=slots.spec||20;document.getElementById('sl-res').value=slots.res||21;}
     const t=new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+    // השב תמונות מ-localStorage אחרי סנכרון
+    doctors.forEach(d=>{try{const p=localStorage.getItem('rambam-photo-'+d.id);if(p)d.photo=p;}catch(e){}});
     setSyncStatus(true,'מסונכרן '+t);render();
   }catch(e){
     setSyncStatus(false,'לא מחובר — עובד מקומית');
@@ -948,11 +983,181 @@ function closePlanOv(){document.getElementById('plan-ov').classList.remove('open
 function showTLTab(tab){
   tlTab=tab;
   const tabs=document.querySelectorAll('.tl-tab');
-  const idx=tab==='torant'?0:tab==='status'?1:2;
+  const idx=tab==='torant'?0:tab==='status'?1:tab==='duty'?2:3;
   tabs.forEach((t,i)=>t.classList.toggle('active',i===idx));
   if(tab==='duty')renderDuty();
+  else if(tab==='plan')renderPlan();
   else renderTimeline();
 }
+
+
+// ── PLANNING VIEW ──
+let upgradeMarks={};
+async function loadUpgradeMarks(){
+  try{const r=await window.storage&&window.storage.get('rambam-upgrades-v1');if(r&&r.value)upgradeMarks=JSON.parse(r.value);}catch(e){}
+}
+async function saveUpgradeMarks(){
+  try{await window.storage&&window.storage.set('rambam-upgrades-v1',JSON.stringify(upgradeMarks));}catch(e){}
+}
+function toggleUpgrade(resId,torant){
+  const k=resId+'_'+torant;
+  upgradeMarks[k]=!upgradeMarks[k];
+  saveUpgradeMarks();
+  renderPlan();
+}
+
+function presenceInMonth(d,yr,mo){
+  if(!d.endDate)return 'present';
+  const parts=d.endDate.split('/');
+  const em=parseInt(parts[0]),ey=parseInt(parts[1]);
+  const endMs=new Date(ey,em-1,1).getTime();
+  const monthMs=new Date(yr,mo-1,1).getTime();
+  if(monthMs>=endMs)return 'gone';
+  const nextMonthMs=new Date(yr,mo,1).getTime();
+  if(endMs<=nextMonthMs&&endMs>monthMs)return 'ending';
+  const absentSt=['rotation','rambam','miluim','maternity'];
+  if(absentSt.includes(d.st2||'none'))return 'absent';
+  return 'present';
+}
+
+function renderPlan(){
+  const ress=doctors.filter(function(d){return d.role==='resident';}).sort(function(a,b){return (b.year||1)-(a.year||1);});
+  const now2=new Date();
+  const MONTHS=12;
+  const months=[];
+  const MN=['ינו','פבר','מרץ','אפר','מאי','יונ','יול','אוג','ספט','אוק','נוב','דצמ'];
+  for(let i=0;i<MONTHS;i++){
+    const dt=new Date(now2.getFullYear(),now2.getMonth()+i,1);
+    months.push({year:dt.getFullYear(),month:dt.getMonth()+1,label:MN[dt.getMonth()]+" '"+String(dt.getFullYear()).slice(2)});
+  }
+
+  // חוסרים לכל עמדה
+  const shortage={};
+  for(let t=1;t<=4;t++){
+    shortage[t]=months.map(function(m){
+      const eligible=ress.filter(function(d){return d.torant===t;});
+      const present=eligible.filter(function(d){
+        const p=presenceInMonth(d,m.year,m.month);
+        return p==='present'||p==='ending';
+      });
+      const upgrading=ress.filter(function(d){
+        if(d.torant<=t)return false;
+        const k=d.id+'_'+t;
+        if(!upgradeMarks[k])return false;
+        const p=presenceInMonth(d,m.year,m.month);
+        return p==='present'||p==='ending';
+      });
+      return{count:present.length+upgrading.length,base:present.length,upgraded:upgrading.length};
+    });
+  }
+
+  // לוח חוסרים
+  let shortH='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:1rem;">';
+  shortH+='<div style="font-size:12px;font-weight:600;margin-bottom:10px;">לוח זמינות תורנים — 12 חודשים קדימה</div>';
+  const mLabels=months.map(function(m){return '<div style="width:28px;text-align:center;font-size:7px;color:var(--faint);">'+m.label+'</div>';}).join('');
+  shortH+='<div style="display:flex;align-items:center;gap:2px;margin-bottom:4px;"><div style="width:65px;"></div>'+mLabels+'</div>';
+  for(let t=1;t<=4;t++){
+    const cells=shortage[t].map(function(s,i){
+      const color=s.count===0?'background:#FEE8E8;color:#B91C1C;font-weight:700':s.count===1?'background:#FEF3E0;color:#B45309;font-weight:600':'background:#E8F5EE;color:#1A7A4A;';
+      const up=s.upgraded>0?'<span style="font-size:6px;">+'+s.upgraded+'</span>':'';
+      const tip='תורן '+t+' — '+months[i].label+': '+s.count+' זמינים'+(s.upgraded>0?' (כולל '+s.upgraded+' מתאמנים)':'');
+      return '<div style="width:28px;height:22px;border-radius:3px;'+color+';display:flex;align-items:center;justify-content:center;font-size:9px;cursor:default;" title="'+tip+'">'+s.count+up+'</div>';
+    }).join('');
+    shortH+='<div style="display:flex;align-items:center;gap:2px;margin-bottom:3px;"><div style="width:65px;font-size:10px;color:var(--muted);text-align:right;padding-left:6px;">תורן '+t+'</div>'+cells+'</div>';
+  }
+  shortH+='<div style="display:flex;gap:14px;margin-top:8px;font-size:9px;color:var(--muted);">';
+  shortH+='<span><span style="display:inline-block;width:10px;height:10px;background:#E8F5EE;border-radius:2px;margin-left:3px;"></span>תקין</span>';
+  shortH+='<span><span style="display:inline-block;width:10px;height:10px;background:#FEF3E0;border-radius:2px;margin-left:3px;"></span>גבולי (1)</span>';
+  shortH+='<span><span style="display:inline-block;width:10px;height:10px;background:#FEE8E8;border-radius:2px;margin-left:3px;"></span>חוסר (0)</span>';
+  shortH+='<span style="margin-right:auto;">ירוק=נוכח · כתום=מסיים · אדום=נעדר · אפור=הסתיים</span>';
+  shortH+='</div></div>';
+
+  // טבלת מתמחים
+  const mHeaders=months.map(function(m){return '<th style="min-width:30px;font-size:8px;font-weight:500;color:var(--muted);">'+m.label+'</th>';}).join('');
+  let rows='';
+  for(let t=1;t<=4;t++){
+    const group=ress.filter(function(d){return d.torant===t;});
+    if(!group.length)continue;
+    const endingSoon=group.filter(function(d){
+      if(!d.endDate)return false;
+      const p=d.endDate.split('/');
+      const diff=(new Date(parseInt(p[1]),parseInt(p[0])-1,1)-now2)/(1000*60*60*24*30.44);
+      return diff>=0&&diff<=12;
+    }).length;
+    rows+='<tr><td colspan="'+(MONTHS+3)+'" style="background:var(--bg);padding:5px 10px;font-size:10px;font-weight:600;border-bottom:1px solid var(--border);">';
+    rows+='<span style="background:var(--blue-light);color:var(--blue);border-radius:4px;padding:2px 8px;margin-left:8px;">תורן '+t+'</span>';
+    rows+='<span style="color:var(--muted);">'+group.length+' מוגדרים</span>';
+    if(endingSoon>0){rows+='<span style="color:var(--red);margin-right:8px;"> ⚠ '+endingSoon+' מסיימים ב-12 חודשים</span>';}
+    rows+='</td></tr>';
+    for(let ri=0;ri<group.length;ri++){
+      const d=group[ri];
+      // כפתורי הכשרה — רק לעמדות עם מספר נמוך יותר (יותר מוכשר)
+      let upgradeBtns='';
+      for(let ut=t-1;ut>=1;ut--){
+        const k=d.id+'_'+ut;
+        const active=upgradeMarks[k];
+        const bg=active?'#EDE9FE':'var(--bg)';
+        const col=active?'#5B21B6':'var(--faint)';
+        const brd=active?'#5B21B6':'var(--border)';
+        upgradeBtns+='<span onclick="toggleUpgrade('+d.id+','+ut+')" style="display:inline-flex;align-items:center;font-size:8px;padding:1px 5px;border-radius:4px;background:'+bg+';color:'+col+';cursor:pointer;border:1px solid '+brd+';margin-right:2px;" title="סמן כמתאמן לתורן '+ut+'">'+ut+'&#8593;'+(active?' ✦':'')+'</span>';
+      }
+      // תאי חודשים
+      let cells='';
+      for(let mi=0;mi<months.length;mi++){
+        const m=months[mi];
+        const p=presenceInMonth(d,m.year,m.month);
+        const bg={present:'#1A7A4A',absent:'#BE185D',ending:'#F59E0B',gone:'#E8E5DF'}[p]||'#E8E5DF';
+        const op={present:'.85',absent:'.7',ending:'1',gone:'.3'}[p]||'.3';
+        // tooltip
+        const shortName=d.name.replace(/[^ ]* /,'');
+        const FULLMON=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+        const monthName=FULLMON[m.month-1];
+        let segLabel='';
+        const plan=d.plan||[];
+        for(let si=0;si<plan.length;si++){
+          const seg=plan[si];
+          if(seg.start&&seg.end){
+            const sp=seg.start.split('/');const ep=seg.end.split('/');
+            const sMs=new Date(parseInt(sp[1]),parseInt(sp[0])-1,1).getTime();
+            const eMs=new Date(parseInt(ep[1]),parseInt(ep[0])-1,1).getTime();
+            const mMs=new Date(m.year,m.month-1,1).getTime();
+            if(mMs>=sMs&&mMs<eMs){segLabel=seg.label;break;}
+          }
+        }
+        const stLbl={present:'נוכח',absent:'לא נוכח',ending:'מסיים',gone:'הסתיים'}[p]||p;
+        const tip=shortName+' — '+monthName+' '+m.year+(segLabel?' — '+segLabel:'')+' ('+stLbl+')';
+        cells+='<td style="padding:2px;"><div style="width:26px;height:18px;border-radius:3px;background:'+bg+';opacity:'+op+';margin:auto;cursor:default;" title="'+tip+'"></div></td>';
+      }
+      // חודשים נותרים
+      let monthsLeft='';
+      if(d.endDate){
+        const ep=d.endDate.split('/');
+        const ml=Math.round((new Date(parseInt(ep[1]),parseInt(ep[0])-1,1)-now2)/(1000*60*60*24*30.44));
+        const col=ml<=6?'var(--red)':ml<=12?'var(--amber)':'var(--faint)';
+        monthsLeft='<div style="font-size:8px;color:'+col+';">'+(ml>0?'עוד '+ml+" ח'":'הסתיים')+'</div>';
+      }
+      rows+='<tr>';
+      rows+='<td style="padding:4px 10px;text-align:right;position:sticky;right:0;background:var(--surface);min-width:130px;">';
+      rows+='<div style="font-weight:500;font-size:11px;">'+d.name.replace(/[^ ]* /,'')+'</div>'+monthsLeft;
+      rows+='</td>';
+      rows+='<td style="font-size:9px;color:var(--muted);text-align:center;">שנה '+(d.year||'')+'</td>';
+      rows+='<td style="padding:2px 4px;text-align:center;">'+(upgradeBtns||'—')+'</td>';
+      rows+=cells;
+      rows+='</tr>';
+    }
+  }
+
+  document.getElementById('tl-content').innerHTML=shortH+
+    '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:11px;width:100%;min-width:800px;">'+
+    '<thead><tr style="background:var(--bg);">'+
+    '<th style="padding:6px 10px;text-align:right;position:sticky;right:0;background:var(--bg);min-width:130px;">מתמחה</th>'+
+    '<th style="padding:6px 8px;text-align:center;color:var(--muted);font-size:9px;">שנה</th>'+
+    '<th style="padding:6px 8px;text-align:center;color:var(--muted);font-size:9px;">הכשרה</th>'+
+    mHeaders+
+    '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+
 
 // ── DUTY TRACKING ──
 // מבנה: dutyData = { [residentId]: { [position]: count } }
@@ -1050,7 +1255,7 @@ function tlRowHTML(d,ctx){
   return `<div class="tl-row${abs?' absent':''}">
     <div class="tl-av" onclick="openPlanOv(${d.id})" style="cursor:pointer;">${ini(d.name)}</div>
     <div class="tl-name-blk"><div class="tl-name" onclick="openPlanOv(${d.id})" style="cursor:pointer;">${d.name.replace(/ד"ר\s*/,'')}</div><div class="tl-sub">שנה ${d.year}${mlS?' · '+mlS:''}</div></div>
-    <span class="tl-st ${d.st2||'none'}">${ST2_LABELS[d.st2||'none']}</span>
+    ${(d.st2&&d.st2!=='none')?`<span class="tl-st ${d.st2}">${ST2_LABELS[d.st2]}</span>`:''}
     <span class="tl-pres ${abs?'absent':'present'}">${abs?'לא נוכח':'נוכח'}</span>
     ${d.torant>0?`<div class="tl-tr">${d.torant}</div>`:''}
     <div class="tl-area" onclick="openPlanOv(${d.id})" style="cursor:pointer;display:flex;align-items:center;justify-content:flex-start;padding:0 8px;">
@@ -1260,11 +1465,43 @@ function saveDoctor(){
   const fi=document.getElementById('f-photo');
   const finish=(photo)=>{
     const obj={name,title,role,status,startDate,endDate,year,half,star:star&&year===6,kupah,torant:cT,vacantType:cVT,dept:cD,shlav:cSh,st2:cSt2};
-    if(editId!==null){const d=doctors.find(x=>x.id===editId);if(d){Object.assign(d,obj);if(photo)d.photo=photo;}}
-    else doctors.push({id:nextId++,...obj,photo:photo||null,plan:[]});
+    if(editId!==null){
+      const d=doctors.find(x=>x.id===editId);
+      if(d){
+        Object.assign(d,obj);
+        if(photo){
+          d.photo=photo;
+          // שמור תמונה ב-localStorage לפי ID
+          try{localStorage.setItem('rambam-photo-'+d.id, photo);}catch(e){}
+        }
+      }
+    } else {
+      const newId=nextId++;
+      doctors.push({id:newId,...obj,photo:photo||null,plan:[]});
+      if(photo){try{localStorage.setItem('rambam-photo-'+newId, photo);}catch(e){}}
+    }
     closeEdit();saveData();
   };
-  if(fi.files&&fi.files[0]){const r=new FileReader();r.onload=e=>finish(e.target.result);r.readAsDataURL(fi.files[0]);}
+  if(fi.files&&fi.files[0]){
+    // דחס את התמונה לפני השמירה
+    const file=fi.files[0];
+    const img=new Image();
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      img.onload=()=>{
+        const canvas=document.createElement('canvas');
+        const MAX=120; // פיקסלים מקסימום
+        let w=img.width,h=img.height;
+        if(w>h){if(w>MAX){h=h*MAX/w;w=MAX;}}else{if(h>MAX){w=w*MAX/h;h=MAX;}}
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        const compressed=canvas.toDataURL('image/jpeg',0.7);
+        finish(compressed);
+      };
+      img.src=ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
   else finish(null);
 }
 function deleteDoctor(){if(editId===null)return;doctors=doctors.filter(x=>+x.id!==+editId);closeEdit();saveData();}
@@ -1384,6 +1621,14 @@ const FULL_DATA=[{"id":1,"name":"פרופ' עידו שולט","title":"מנהל 
   }catch(e){}
   // הצג מיד את ה-FULL_DATA
   await loadDutyData();
+  await loadUpgradeMarks();
+  // טען תמונות מ-localStorage
+  doctors.forEach(d=>{
+    try{
+      const photo=localStorage.getItem('rambam-photo-'+d.id);
+      if(photo)d.photo=photo;
+    }catch(e){}
+  });
   render();
   setSyncStatus(null,'מתחבר לשרת...');
   // סנכרן מ-Sheets (ימזג edits מעל FULL_DATA, לא ידרוס)
