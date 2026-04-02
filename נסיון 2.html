@@ -181,7 +181,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-h
 .tl-pres{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:500;flex-shrink:0;margin-left:4px;}
 .tl-pres.present{background:var(--green-light);color:var(--green);}
 .tl-pres.absent{background:var(--amber-light);color:var(--amber);}
-.tl-area{flex:1;position:relative;height:46px;min-width:0;cursor:pointer;}
+.tl-area{flex:1;position:relative;height:36px;min-width:120px;cursor:pointer;}
 .tl-bg-line{position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);transform:translateY(-50%);}
 .tl-seg{position:absolute;top:50%;transform:translateY(-50%);height:10px;border-radius:3px;}
 .tl-seg.cur{height:14px;z-index:1;}
@@ -513,25 +513,40 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="page view active" id="view-staffing">
   <div class="container">
     <div class="stats-bar">
-      <div class="stat-chip"><div class="stat-chip-lbl">תקנים פנויים</div><div class="stat-chip-val danger" id="s-vac">0</div></div>
-      <div class="stat-chip"><div class="stat-chip-lbl">מסיימים בקרוב</div><div class="stat-chip-val warn" id="s-leav">0</div></div>
-      <div class="stat-chip"><div class="stat-chip-lbl">ממשיכים</div><div class="stat-chip-val ok" id="s-stay">0</div></div>
-      <div class="stat-chip"><div class="stat-chip-lbl">מאויישים</div><div class="stat-chip-val" id="s-used">0</div></div>
+      <div class="stat-chip">
+        <div class="stat-chip-lbl">סה"כ תקנים</div>
+        <div class="stat-chip-val" id="s-total">0</div>
+        <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;">
+          <span style="font-size:9px;color:var(--muted);">מומחים <b id="s-spec-slots">0</b></span>
+          <span style="font-size:9px;color:var(--muted);">מתמחים <b id="s-res-slots">0</b></span>
+        </div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-lbl">תקנים מאויישים</div>
+        <div class="stat-chip-val ok" id="s-used">0</div>
+        <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;">
+          <span style="font-size:9px;color:var(--muted);">מומחים <b id="s-spec-used">0</b></span>
+          <span style="font-size:9px;color:var(--muted);">מתמחים <b id="s-res-used">0</b></span>
+        </div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-lbl">תקנים פנויים</div>
+        <div class="stat-chip-val danger" id="s-vac">0</div>
+        <div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;">
+          <span style="font-size:9px;color:var(--muted);">מומחים <b id="s-spec-vac">0</b></span>
+          <span style="font-size:9px;color:var(--muted);">מתמחים <b id="s-res-vac">0</b></span>
+        </div>
+      </div>
+
     </div>
     <div class="staffing-layout">
       <div class="staffing-main">
-        <div class="slots-bar">
-          <div class="slots-bar-title">תקנים מאושרים</div>
-          <div class="slot-ctrl"><label>מומחים:</label><input type="number" id="sl-spec" min="0" value="20" onchange="saveData()"/><span class="slot-info" id="si-spec"></span></div>
-          <div class="slot-ctrl"><label>מתמחים:</label><input type="number" id="sl-res" min="0" value="21" onchange="saveData()"/><span class="slot-info" id="si-res"></span></div>
+        <div style="display:none;">
+          <input type="number" id="sl-spec" min="0" value="20" onchange="saveData()"/>
+          <input type="number" id="sl-res" min="0" value="21" onchange="saveData()"/>
+          <span id="si-spec"></span><span id="si-res"></span>
         </div>
-        <div class="legend">
-          <div class="leg-item"><div class="leg-dot" style="background:var(--ob);"></div>מיילדות</div>
-          <div class="leg-item"><div class="leg-dot" style="background:var(--gyn);"></div>גינקולוגיה</div>
-          <div class="leg-item"><div class="leg-dot" style="background:var(--fer);"></div>פוריות</div>
-          <div style="width:1px;height:12px;background:var(--border);margin:0 4px;"></div>
-          <div class="leg-item"><div class="leg-sq" style="border:2px solid var(--pink);background:var(--pink-light);"></div>קופה</div>
-        </div>
+
         <div class="section"><div class="sec-hd"><div class="sec-title">תקנים פנויים</div><div class="sec-count" id="cnt-vac"></div></div><div class="cards-row" id="row-vac"></div></div>
         <div class="section"><div class="sec-hd"><div class="sec-title">מומחים</div><div class="sec-count" id="cnt-spec"></div></div><div class="dept-summary" id="dept-summary"></div><div class="cards-row" id="row-spec" style="margin-top:8px;"></div></div>
         <div class="section"><div class="sec-hd"><div class="sec-title">מתמחים</div><div class="sec-count" id="cnt-res"></div></div><div id="res-rows"></div></div>
@@ -557,6 +572,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="tl-tabs">
       <div class="tl-tab active" onclick="showTLTab('torant')">פילוח הכשרות</div>
       <div class="tl-tab" onclick="showTLTab('status')">לוח סטטוס</div>
+      <div class="tl-tab" onclick="showTLTab('duty')">כמות תורנויות</div>
     </div>
     <div id="tl-content"></div>
   </div>
@@ -620,6 +636,18 @@ function calcYr(s){if(!s||s.length<7)return null;const[m,y]=s.split('/');const m
 function addY(s,n){const[m,y]=s.split('/');return String(+m).padStart(2,'0')+'/'+(+y+n);}
 function pctCol(p){return p>=100?'var(--green)':p>=60?'var(--amber)':'var(--red)';}
 function isAbsent(d){return ABSENT.includes(d.st2||'none');}
+function fmtShortPlan(d){
+  const cs=curSeg(d);
+  if(cs)return cs.label+(cs.end?' עד '+fmt(cs.end):'');
+  if(!d.plan||!d.plan.length)return'אין תוכנית';
+  // מצא סבב עתידי קרוב
+  const nm=now.getTime();
+  for(const s of d.plan){
+    const a=dms(s.start);
+    if(a>nm)return'בקרוב: '+s.label+' '+fmt(s.start);
+  }
+  return'לחץ לפרטים';
+}
 function curSeg(d){const t=now.getTime();for(const s of d.plan||[]){const a=dms(s.start),b=dms(s.end||'');if(a&&b&&t>=a&&t<b)return s;}return null;}
 function shortName(d){return(d.name||'').replace(/ד"ר\s*/,'').replace(/פרופ'\s*/,'').trim().split(' ').pop();}
 
@@ -798,12 +826,41 @@ function render(){
   e=document.getElementById('si-res');e.textContent=re.t;e.className='slot-info '+re.c;
 
   // stats
-  const vac=Math.max(0,sS-uS)+Math.max(0,sR-uR)+vacs.reduce((s,d)=>s+(d.half?0.5:1),0);
-  let l=0,used=0;doctors.forEach(d=>{if(d.status==='leaving')l++;else if(d.status==='active')used+=d.half?0.5:1;});
-  document.getElementById('s-vac').textContent=fmtN(vac);
-  document.getElementById('s-leav').textContent=l;
-  document.getElementById('s-stay').textContent=stars;
-  document.getElementById('s-used').textContent=fmtN(used);
+  const specUsed=uS;
+  const resUsed=uR;
+  const totalUsed=specUsed+resUsed;
+  const specVac=Math.max(0,sS-specUsed);
+  const resVac=Math.max(0,sR-resUsed);
+  const totalVac=specVac+resVac;
+  const totalSlots=sS+sR;
+  const vacCards=vacs.length;
+  let l=0,used=0;doctors.forEach(d=>{if(d.status==='leaving')l++;else if(d.status==='active'&&d.role!=='vacant'&&d.role!=='candidate')used+=d.half?0.5:1;});
+
+  // סה"כ תקנים
+  const stTotal=document.getElementById('s-total');
+  if(stTotal)stTotal.textContent=fmtN(totalSlots);
+  const ssSlots=document.getElementById('s-spec-slots');
+  if(ssSlots)ssSlots.textContent=fmtN(sS);
+  const srSlots=document.getElementById('s-res-slots');
+  if(srSlots)srSlots.textContent=fmtN(sR);
+
+  // מאויישים
+  document.getElementById('s-used').textContent=fmtN(totalUsed);
+  const ssUsed=document.getElementById('s-spec-used');
+  if(ssUsed)ssUsed.textContent=fmtN(specUsed);
+  const srUsed=document.getElementById('s-res-used');
+  if(srUsed)srUsed.textContent=fmtN(resUsed);
+
+  // פנויים
+  document.getElementById('s-vac').textContent=fmtN(totalVac);
+  const ssVac=document.getElementById('s-spec-vac');
+  if(ssVac)ssVac.textContent=fmtN(specVac);
+  const srVac=document.getElementById('s-res-vac');
+  if(srVac)srVac.textContent=fmtN(resVac);
+
+  // כרטיסי תקן פנוי
+  const svCards=document.getElementById('s-vac-cards');
+  if(svCards)svCards.textContent=vacCards;
 
   renderSidebar();
 }
@@ -824,7 +881,6 @@ function renderSidebar(){
   document.getElementById('sb-torant').innerHTML=th;
 
   const cats=[
-    {key:'none',label:'במחלקה',color:'var(--green)'},
     {key:'gyn',label:'סבב נשים',color:'var(--blue)'},
     {key:'ob',label:'סבב מיילדות',color:'#1A7A4A'},
     {key:'rotation',label:'רוטציה חיצונית',color:'#888780'},
@@ -834,7 +890,8 @@ function renderSidebar(){
   ];
   let sh='';
   for(const c of cats){
-    const g=c.key==='none'?ress.filter(d=>!['gyn','ob','rotation','rambam','miluim','maternity'].includes(d.st2||'none')):ress.filter(d=>(d.st2||'none')===c.key);
+    if(c.key==='none')continue;
+    const g=ress.filter(d=>(d.st2||'none')===c.key);
     if(!g.length)continue;
     sh+=`<div class="st-row"><div class="st-label"><div class="st-dot" style="background:${c.color};flex-shrink:0;"></div>${c.label}</div><div style="font-size:14px;font-weight:600;color:var(--text);">${g.length}</div></div>`;
   }
@@ -890,8 +947,88 @@ function closePlanOv(){document.getElementById('plan-ov').classList.remove('open
 // ── TIMELINE VIEW ──
 function showTLTab(tab){
   tlTab=tab;
-  document.querySelectorAll('.tl-tab').forEach((t,i)=>t.classList.toggle('active',i===(tab==='torant'?0:1)));
-  renderTimeline();
+  const tabs=document.querySelectorAll('.tl-tab');
+  const idx=tab==='torant'?0:tab==='status'?1:2;
+  tabs.forEach((t,i)=>t.classList.toggle('active',i===idx));
+  if(tab==='duty')renderDuty();
+  else renderTimeline();
+}
+
+// ── DUTY TRACKING ──
+// מבנה: dutyData = { [residentId]: { [position]: count } }
+// עמדות: '1','2','3','4','senior','rambam' וכד'
+let dutyData = {};
+
+async function loadDutyData(){
+  try{
+    const r=await window.storage&&window.storage.get('rambam-duty-v1');
+    if(r&&r.value)dutyData=JSON.parse(r.value);
+  }catch(e){}
+}
+async function saveDutyData(){
+  try{await window.storage&&window.storage.set('rambam-duty-v1',JSON.stringify(dutyData));}catch(e){}
+}
+
+function updateDuty(id,pos,val){
+  if(!dutyData[id])dutyData[id]={};
+  dutyData[id][pos]=parseInt(val)||0;
+  saveDutyData();
+}
+
+function renderDuty(){
+  const ress=doctors.filter(d=>d.role==='resident').sort((a,b)=>(b.year||1)-(a.year||1));
+  const positions=[
+    {key:'pos1',label:'עמדה 1'},
+    {key:'pos2',label:'עמדה 2'},
+    {key:'pos3',label:'עמדה 3'},
+    {key:'pos4',label:'עמדה 4'},
+  ];
+
+  let html=`<div style="overflow-x:auto;">
+  <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:700px;">
+    <thead>
+      <tr style="background:var(--bg);border-bottom:2px solid var(--border);">
+        <th style="padding:8px 12px;text-align:right;font-weight:600;position:sticky;right:0;background:var(--bg);z-index:1;">מתמחה</th>
+        <th style="padding:8px 6px;text-align:center;font-weight:600;color:var(--muted);font-size:9px;">שנה</th>
+        ${positions.map(p=>`<th style="padding:8px 6px;text-align:center;font-weight:600;color:var(--muted);font-size:9px;">${p.label}</th>`).join('')}
+        <th style="padding:8px 6px;text-align:center;font-weight:600;color:var(--text);font-size:10px;">סה"כ</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  ress.forEach((d,i)=>{
+    const dd=dutyData[d.id]||{};
+    const total=positions.reduce((s,p)=>s+(dd[p.key]||0),0);
+    const bg=i%2===0?'var(--surface)':'var(--bg)';
+    html+=`<tr style="border-bottom:1px solid var(--border);background:${bg};">
+      <td style="padding:6px 12px;font-weight:500;position:sticky;right:0;background:${bg};z-index:1;">${d.name.replace(/ד"ר\s*/,'')}</td>
+      <td style="padding:4px 6px;text-align:center;color:var(--muted);">${d.year||''}</td>
+      ${positions.map(p=>`<td style="padding:4px 6px;text-align:center;">
+        <input type="number" min="0" value="${dd[p.key]||0}"
+          onchange="updateDuty(${d.id},'${p.key}',this.value)"
+          style="width:48px;text-align:center;border:1px solid var(--border);border-radius:5px;padding:3px;font-size:11px;"/>
+      </td>`).join('')}
+      <td style="padding:4px 6px;text-align:center;font-weight:600;color:${total>0?'var(--blue)':'var(--faint)'};">${total||'—'}</td>
+    </tr>`;
+  });
+
+  html+=`</tbody>
+    <tfoot>
+      <tr style="background:var(--bg);border-top:2px solid var(--border);">
+        <td style="padding:6px 12px;font-weight:600;position:sticky;right:0;background:var(--bg);">סה"כ</td>
+        <td></td>
+        ${positions.map(p=>{
+          const sum=ress.reduce((s,d)=>s+((dutyData[d.id]||{})[p.key]||0),0);
+          return`<td style="padding:4px 6px;text-align:center;font-weight:600;color:var(--text);">${sum||'—'}</td>`;
+        }).join('')}
+        <td style="padding:4px 6px;text-align:center;font-weight:600;">
+          ${ress.reduce((s,d)=>s+positions.reduce((ss,p)=>ss+((dutyData[d.id]||{})[p.key]||0),0),0)||'—'}
+        </td>
+      </tr>
+    </tfoot>
+  </table></div>`;
+
+  document.getElementById('tl-content').innerHTML=html;
 }
 
 function tlRowHTML(d,ctx){
@@ -916,11 +1053,8 @@ function tlRowHTML(d,ctx){
     <span class="tl-st ${d.st2||'none'}">${ST2_LABELS[d.st2||'none']}</span>
     <span class="tl-pres ${abs?'absent':'present'}">${abs?'לא נוכח':'נוכח'}</span>
     ${d.torant>0?`<div class="tl-tr">${d.torant}</div>`:''}
-    <div class="tl-area" onclick="openPlanOv(${d.id})" style="cursor:pointer;">
-      <div class="tl-bg-line"></div>${segs}
-      <div class="tl-now" style="left:${np.toFixed(1)}%;"></div>
-      <div class="tl-lbl-start">${fmt(plan[0].start)}</div>
-      ${cel?`<div class="tl-lbl-end" style="left:${Math.min(90,np).toFixed(1)}%;">${cel}</div>`:''}
+    <div class="tl-area" onclick="openPlanOv(${d.id})" style="cursor:pointer;display:flex;align-items:center;justify-content:flex-start;padding:0 8px;">
+      <span style="font-size:10px;color:var(--blue);text-decoration:underline;text-decoration-style:dotted;">${fmtShortPlan(d)}</span>
     </div>
     <button onclick="event.stopPropagation();openStEdit(${d.id})" style="flex-shrink:0;margin:0 6px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:10px;color:var(--muted);" title="ערוך רוטציות וסטטוס">✏</button>
   </div>`;
@@ -1249,6 +1383,7 @@ const FULL_DATA=[{"id":1,"name":"פרופ' עידו שולט","title":"מנהל 
     if(r&&r.value)Object.assign(shlavData,JSON.parse(r.value));
   }catch(e){}
   // הצג מיד את ה-FULL_DATA
+  await loadDutyData();
   render();
   setSyncStatus(null,'מתחבר לשרת...');
   // סנכרן מ-Sheets (ימזג edits מעל FULL_DATA, לא ידרוס)
